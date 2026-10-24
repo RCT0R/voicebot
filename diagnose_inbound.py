@@ -158,6 +158,11 @@ async def main() -> int:
         f"  [{'PASS' if matching_trunks else 'FAIL'}] "
         f"LiveKit inbound trunk claims {number}"
     )
+    if matching_trunks and any(getattr(t, "auth_username", "") for t in matching_trunks):
+        print(
+            "  [WARN] The inbound trunk requires SIP digest authentication. "
+            "Vobiz inbound may not send it. Remove INBOUND_SIP_AUTH_* unless confirmed."
+        )
     print(
         f"  [{'PASS' if bound_rules else 'FAIL'}] "
         "A dispatch rule is bound to that trunk"

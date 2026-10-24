@@ -1,0 +1,10 @@
+name = "novi-frontend"
+main = "src/index.js"
+compatibility_date = "2026-10-24"
+
+[vars]
+SITE_NAME = "NOVI"
+INBOUND_NUMBER = "+918064269449"
+
+[observability]
+enabled = true

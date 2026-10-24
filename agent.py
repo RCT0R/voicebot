@@ -297,8 +297,12 @@ def _open_store(settings: config.Settings) -> CallStore:
 
 async def _greet(settings: config.Settings, session: AgentSession) -> None:
     try:
-        handle = session.say(settings.resolved_greeting, allow_interruptions=True)
+        handle = session.say(settings.resolved_greeting, allow_interruptions=False)
         await asyncio.wait_for(handle.wait_for_playout(), timeout=30)
+        logger.info(
+            "greeting finished",
+            extra={"event": "greeting_finished"},
+        )
     except Exception as exc:
         # A caller can hang up while the greeting is playing. Do not mark the
         # call as failed for that expected case.
@@ -430,6 +434,19 @@ async def _run_call(
                         "pipeline failure",
                     )
                 )
+
+        @session.on("user_input_transcribed")
+        def on_user_input(event: Any) -> None:
+            text = getattr(event, "transcript", "") or ""
+            logger.info(
+                "caller speech transcribed",
+                extra={
+                    "event": "caller_speech",
+                    "call_id": ctx.job.id,
+                    "text_length": len(text),
+                    "is_final": bool(getattr(event, "is_final", False)),
+                },
+            )
 
         @ctx.room.on("participant_disconnected")
         def on_participant_disconnected(participant: rtc.RemoteParticipant) -> None:

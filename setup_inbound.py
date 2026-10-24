@@ -277,6 +277,12 @@ async def ensure_inbound(cfg: SetupConfig, *, dry_run: bool = False) -> None:
             "Warning: INBOUND_SIP_ALLOWED_ADDRESSES is empty, so LiveKit accepts SIP "
             "traffic from any source. Restrict this to Vobiz signalling addresses in production."
         )
+    if cfg.auth_username:
+        print(
+            "Warning: inbound SIP digest authentication is enabled. Vobiz's LiveKit "
+            "guide uses IP allowlisting; do not copy the outbound Vobiz username/password "
+            "here unless Vobiz confirms inbound digest auth."
+        )
     if dry_run:
         print("\nDry run: no LiveKit objects were created.")
         print("Inbound trunk configuration:")
