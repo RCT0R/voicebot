@@ -1,0 +1,19 @@
+name = "ai-receptionist-dashboard"
+main = "src/index.js"
+compatibility_date = "2026-10-24"
+
+[vars]
+INBOUND_NUMBER = "Not configured"
+AGENT_NAME = "Receptionist"
+STT_PROVIDER = "Not configured"
+LLM_PROVIDER = "Not configured"
+TTS_PROVIDER = "Not configured"
+MAX_CALL_DURATION_SECONDS = "600"
+
+[[d1_databases]]
+binding = "DB"
+database_name = "receptionist-calls"
+database_id = "REPLACE_WITH_D1_DATABASE_ID"
+
+[observability]
+enabled = true

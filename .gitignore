@@ -1,0 +1,42 @@
+# Environment variables
+.env
+.env.local
+.env.*.local
+deploy.env
+secrets.env
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.ruff_cache/
+
+# Local call records
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Node.js / Next.js
+node_modules/
+.next/
+dist/
+build/
+.DS_Store
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE settings
+.vscode/
+.idea/
+
+# Cloudflare local state and secrets
+cloudflare/.wrangler/
+cloudflare/.dev.vars

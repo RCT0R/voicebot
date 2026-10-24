@@ -1,0 +1,9 @@
+# The agent catches broad exceptions at provider, media, and disk boundaries.
+# Those failures must not escape and leave a caller connected to a dead session.
+# Keep the other checks strict.
+[lint]
+select = ["E4", "E7", "E9", "F", "I", "UP"]
+
+[lint.per-file-ignores]
+# agent.py loads .env before reading AGENT_NAME for the dispatch decorator.
+"agent.py" = ["E402"]
