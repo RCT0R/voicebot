@@ -625,7 +625,16 @@ async def _run_call(
             ctx.shutdown(reason="call finished")
 
 
-server = AgentServer(num_idle_processes=1)
+MAX_CONCURRENT_CALLS = 3
+
+
+def compute_load(server: AgentServer) -> float:
+    """Limit this worker to the Vobiz account's concurrent-call allowance."""
+    return min(len(server.active_jobs) / MAX_CONCURRENT_CALLS, 1.0)
+
+
+server = AgentServer(num_idle_processes=MAX_CONCURRENT_CALLS, load_threshold=0.9)
+server.load_fnc = compute_load
 
 
 @server.rtc_session(agent_name=INBOUND_AGENT_NAME)

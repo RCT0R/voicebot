@@ -188,6 +188,23 @@ def test_transfer_tool_is_absent_unless_enabled():
     assert len(transfer_tools) == 2
 
 
+def test_worker_load_allows_three_concurrent_calls():
+    from agent import MAX_CONCURRENT_CALLS, compute_load
+
+    server = SimpleNamespace(active_jobs=[])
+    assert MAX_CONCURRENT_CALLS == 3
+    assert compute_load(server) == 0.0
+
+    server.active_jobs = [object()]
+    assert compute_load(server) == 1 / 3
+
+    server.active_jobs = [object(), object()]
+    assert compute_load(server) < 0.9
+
+    server.active_jobs = [object(), object(), object()]
+    assert compute_load(server) == 1.0
+
+
 def test_build_transcript_skips_system_and_maps_roles():
     history = [
         SimpleNamespace(role="system", text_content="internal"),
