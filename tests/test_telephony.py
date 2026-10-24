@@ -44,11 +44,9 @@ def test_mask_phone_does_not_expose_the_full_number():
     assert "807138" not in masked
 
 
-def test_derive_livekit_cloud_sip_endpoint():
-    assert (
+def test_sip_endpoint_must_be_explicit():
+    with pytest.raises(ValueError, match="LIVEKIT_SIP_URI"):
         derive_sip_endpoint("wss://demo-project.livekit.cloud")
-        == "demo-project.sip.livekit.cloud"
-    )
 
 
 def test_derive_sip_endpoint_honors_override():
@@ -58,9 +56,12 @@ def test_derive_sip_endpoint_honors_override():
     )
 
 
-def test_derive_sip_endpoint_rejects_unknown_self_hosted_host():
-    with pytest.raises(ValueError, match="LIVEKIT_SIP_URI"):
-        derive_sip_endpoint("wss://voice.example.com")
+def test_sip_endpoint_is_not_the_project_url_subdomain():
+    project_url = "wss://novi-s0tn6cma.livekit.cloud"
+    actual_sip = "34omoz45ad8.sip.livekit.cloud"
+
+    assert derive_sip_endpoint(project_url, actual_sip) == actual_sip
+    assert "novi-s0tn6cma" not in derive_sip_endpoint(project_url, actual_sip)
 
 
 def test_transfer_only_accepts_phone_numbers():

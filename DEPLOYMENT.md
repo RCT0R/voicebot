@@ -48,11 +48,15 @@ Set at least:
 LIVEKIT_URL=wss://your-project.livekit.cloud
 LIVEKIT_API_KEY=...
 LIVEKIT_API_SECRET=...
+LIVEKIT_SIP_URI=your-sip-subdomain.sip.livekit.cloud
 GROQ_API_KEY=...
 DEEPGRAM_API_KEY=...
 VOBIZ_INBOUND_NUMBER=+91...
 AGENT_NAME=receptionist
 ```
+
+`LIVEKIT_SIP_URI` is the SIP host from **Settings > Project > SIP URI**, not the
+project URL subdomain. Do not include the `sip:` prefix.
 
 Validate the environment without starting a call:
 
@@ -134,7 +138,7 @@ X-Auth-ID: {auth_id}
 X-Auth-Token: {auth_token}
 Content-Type: application/json
 
-{"inbound_destination":"your-project.sip.livekit.cloud"}
+{"inbound_destination":"your-sip-subdomain.sip.livekit.cloud"}
 ```
 
 Do not put the Vobiz auth token in source code, logs, or this repository.
@@ -325,18 +329,19 @@ Deploying Next.js to Cloudflare Workers requires an additional OpenNext adapter 
 ## First-call test procedure
 
 1. Run `uv run python setup_inbound.py` and confirm the dispatch rule targets `receptionist`.
-2. Set the Vobiz inbound destination to the printed SIP endpoint, without `sip:`.
+2. Set the Vobiz inbound destination to the SIP host from LiveKit **Settings > Project > SIP URI**, without `sip:` or the project URL subdomain.
 3. Start the agent with `uv run python agent.py dev`.
 4. Confirm the worker registers with LiveKit and the process stays running.
-5. Call the Vobiz number from a different phone.
-6. Listen for the greeting. Say a short sentence, then answer the agent's question.
-7. Watch the agent log for `call_started`, `provider_selected`, and `call_finished`.
-8. Hang up and confirm the log contains `outcome=caller_hangup` or `completed`.
-9. Confirm a row exists:
+5. Run `uv run python diagnose_inbound.py` and confirm the trunk/rule checks pass.
+6. Call the Vobiz number from a different phone.
+7. Listen for the greeting. Say a short sentence, then answer the agent's question.
+8. Watch the agent log for `job_received`, `call_started`, `provider_selected`, and `call_finished`.
+9. Hang up and confirm the log contains `outcome=caller_hangup` or `completed`.
+10. Confirm a row exists:
    ```sh
    uv run python -c "from calls import CallStore; print(CallStore('data/calls.db').recent())"
    ```
-10. If the Cloudflare webhook is configured, refresh the dashboard and confirm the call appears.
+11. If the Cloudflare webhook is configured, refresh the dashboard and confirm the call appears.
 
 Do not claim a real call succeeded until you complete these steps.
 The automated tests in this repository use mocked providers and do not dial a telephone number.

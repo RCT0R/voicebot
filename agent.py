@@ -380,6 +380,14 @@ async def _run_call(
 
     try:
         await asyncio.wait_for(ctx.connect(), timeout=15)
+        logger.info(
+            "connected to room",
+            extra={
+                "event": "room_connected",
+                "call_id": ctx.job.id,
+                "direction": direction,
+            },
+        )
 
         session = AgentSession(
             vad=build_vad(),
@@ -444,6 +452,10 @@ async def _run_call(
         max_duration_task = asyncio.create_task(
             _max_duration_watchdog(settings, session, ctx, state)
         )
+        logger.info(
+            "agent session started",
+            extra={"event": "session_started", "call_id": ctx.job.id, "direction": direction},
+        )
 
         if direction == "inbound":
             if _sip_caller(ctx) is None:
@@ -457,6 +469,10 @@ async def _run_call(
                         "no SIP caller joined within 15 seconds"
                     ) from exc
             state["caller_number"] = _caller_number(ctx)
+            logger.info(
+                "speaking greeting",
+                extra={"event": "greeting_started", "call_id": ctx.job.id},
+            )
             await _greet(settings, session)
         else:
             # Outbound is retained for the existing dashboard and CLI. The call
@@ -597,6 +613,15 @@ server = AgentServer(num_idle_processes=1)
 
 @server.rtc_session(agent_name=INBOUND_AGENT_NAME)
 async def receptionist_session(ctx: JobContext) -> None:
+    logger.info(
+        "job received",
+        extra={
+            "event": "job_received",
+            "job_id": ctx.job.id,
+            "room": ctx.room.name,
+            "agent_name": ctx.job.agent_name,
+        },
+    )
     direction, phone_number, dial = dispatch_mode(ctx)
     await _run_call(ctx, direction, dial_number=phone_number, dial=dial)
 

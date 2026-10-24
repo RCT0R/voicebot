@@ -7,7 +7,6 @@ testable without network access.
 from __future__ import annotations
 
 import re
-from urllib.parse import urlparse
 
 E164_RE = re.compile(r"^\+[1-9]\d{7,14}$")
 
@@ -42,28 +41,23 @@ def mask_phone(value: str | None) -> str:
 
 
 def derive_sip_endpoint(livekit_url: str, override: str | None = None) -> str:
-    """Derive the LiveKit SIP hostname that Vobiz should use as its destination.
+    """Return the LiveKit SIP hostname that Vobiz should use.
 
-    LiveKit Cloud projects use ``wss://<subdomain>.livekit.cloud`` and the SIP
-    endpoint is ``<subdomain>.sip.livekit.cloud``. Self-hosted deployments must
-    set ``LIVEKIT_SIP_URI`` because the hostname cannot be derived reliably.
+    A LiveKit Cloud project URL and its SIP endpoint are different values.
+    For example, the project URL can be ``wss://novi-s0tn6cma.livekit.cloud``
+    while the SIP URI is ``sip:34omoz45ad8.sip.livekit.cloud``.
+
+    Never infer the SIP host from the project URL. Require the value shown in
+    LiveKit Cloud under Settings > Project > SIP URI.
     """
     if override and override.strip():
         host = override.strip().removeprefix("sip:").removeprefix("sips:")
         return host.rstrip("/")
 
-    parsed = urlparse(livekit_url)
-    host = parsed.hostname or ""
-    if not host:
-        raise ValueError("LIVEKIT_URL must contain a hostname")
-    if host.startswith("sip."):
-        return host
-    if host.endswith(".livekit.cloud"):
-        subdomain = host.split(".")[0]
-        return f"{subdomain}.sip.livekit.cloud"
     raise ValueError(
-        "Cannot derive a SIP endpoint from a self-hosted LIVEKIT_URL. "
-        "Set LIVEKIT_SIP_URI to the SIP hostname."
+        "LIVEKIT_SIP_URI is required. Copy the SIP URI from LiveKit Cloud "
+        "Settings > Project. The project URL subdomain and the SIP subdomain "
+        "can differ. Do not include the sip: prefix."
     )
 
 

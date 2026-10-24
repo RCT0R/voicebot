@@ -10,6 +10,8 @@ from __future__ import annotations
 import logging
 from typing import Any
 
+from livekit.plugins import deepgram, noise_cancellation, openai, silero
+
 from config import Settings
 
 logger = logging.getLogger("receptionist.providers")
@@ -18,8 +20,6 @@ GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
 def build_llm(settings: Settings) -> Any:
-    from livekit.plugins import openai
-
     if settings.llm_provider == "groq":
         logger.info(
             "using Groq LLM",
@@ -53,8 +53,6 @@ def build_llm(settings: Settings) -> Any:
 
 def build_stt(settings: Settings) -> Any:
     if settings.stt_provider == "deepgram":
-        from livekit.plugins import deepgram
-
         logger.info(
             "using Deepgram STT",
             extra={"event": "provider_selected", "provider": "deepgram", "model": settings.stt_model},
@@ -67,8 +65,6 @@ def build_stt(settings: Settings) -> Any:
             punctuate=True,
             smart_format=True,
         )
-
-    from livekit.plugins import openai
 
     groq_language = "" if settings.stt_language.lower() == "multi" else settings.stt_language
     logger.info(
@@ -90,8 +86,6 @@ def build_stt(settings: Settings) -> Any:
 
 def build_tts(settings: Settings) -> Any:
     if settings.tts_provider == "deepgram":
-        from livekit.plugins import deepgram
-
         logger.info(
             "using Deepgram TTS",
             extra={
@@ -104,8 +98,6 @@ def build_tts(settings: Settings) -> Any:
             model=settings.deepgram_tts_model,
             api_key=settings.deepgram_api_key,
         )
-
-    from livekit.plugins import openai
 
     if settings.tts_provider == "groq":
         logger.info(
@@ -140,8 +132,6 @@ def build_tts(settings: Settings) -> Any:
 
 
 def build_vad() -> Any:
-    from livekit.plugins import silero
-
     return silero.VAD.load()
 
 
@@ -149,8 +139,6 @@ def build_noise_cancellation(enabled: bool) -> Any | None:
     if not enabled:
         return None
     try:
-        from livekit.plugins import noise_cancellation
-
         return noise_cancellation.BVCTelephony()
     except Exception as exc:
         logger.warning(

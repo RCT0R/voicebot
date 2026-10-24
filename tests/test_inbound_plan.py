@@ -16,6 +16,7 @@ SETUP_ENV = {
     "LIVEKIT_URL": "wss://demo-project.livekit.cloud",
     "LIVEKIT_API_KEY": "lk_test_key",
     "LIVEKIT_API_SECRET": "lk_test_secret_do_not_use",
+    "LIVEKIT_SIP_URI": "34omoz45ad8.sip.livekit.cloud",
     "VOBIZ_INBOUND_NUMBER": "+918071387434",
     "AGENT_NAME": "receptionist",
 }
@@ -38,6 +39,13 @@ def test_setup_config_rejects_invalid_allowed_address():
     env = dict(SETUP_ENV)
     env["INBOUND_SIP_ALLOWED_ADDRESSES"] = "phone.example.com"
     with pytest.raises(ConfigError, match="INBOUND_SIP_ALLOWED_ADDRESSES"):
+        SetupConfig.from_env(env)
+
+
+def test_setup_config_requires_explicit_sip_uri():
+    env = dict(SETUP_ENV)
+    env.pop("LIVEKIT_SIP_URI")
+    with pytest.raises(ConfigError, match="LIVEKIT_SIP_URI"):
         SetupConfig.from_env(env)
 
 

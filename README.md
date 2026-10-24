@@ -19,7 +19,7 @@ The original outbound calling workflow is retained as an optional path for the e
 | Vobiz inbound routing | Implemented and provisioning plan unit-tested; not run against a live LiveKit project |
 | Error handling and cleanup | Implemented, including maximum duration and disconnect paths |
 | Call records | Implemented with SQLite and optional Cloudflare D1 delivery |
-| Automated tests | 67 Python tests and 13 Cloudflare Worker tests pass |
+| Automated tests | 68 Python tests and 13 Cloudflare Worker tests pass |
 | Local LiveKit worker registration | Verified against a local LiveKit server; registered as `receptionist` |
 | LiveKit SIP provisioning | Blocked locally because the open-source server requires Redis for SIP; not run against LiveKit Cloud |
 | Docker image | Builds for arm64 and linux/amd64 locally; imports and entrypoint verified; not deployed |
@@ -110,6 +110,7 @@ The agent validates provider names and required keys at startup.
 | `telephony.py` | E.164 validation, phone masking, SIP endpoint derivation, and safe transfer targets. |
 | `logging_setup.py` | Text or JSON logs with credential redaction. |
 | `setup_inbound.py` | Creates a LiveKit inbound trunk and dispatch rule for the Vobiz number. Reuses existing objects and never deletes. |
+| `diagnose_inbound.py` | Read-only LiveKit inbound trunk, dispatch-rule, and recent-room diagnostic. Prints no secrets. |
 | `make_call.py` | Optional outbound dispatch for manual testing. |
 | `create_trunk.py`, `setup_trunk.py`, `list_trunks.py` | Optional Vobiz outbound trunk utilities. |
 | `tests/` | Pytest suite for configuration, routing plans, call lifecycle, providers, summaries, and webhook delivery. |
@@ -134,7 +135,8 @@ cp .env.example .env
 ```
 
 Edit `.env`.
-Set the LiveKit credentials, `GROQ_API_KEY`, `DEEPGRAM_API_KEY`, and `VOBIZ_INBOUND_NUMBER`.
+Set the LiveKit credentials, `LIVEKIT_SIP_URI`, `GROQ_API_KEY`, `DEEPGRAM_API_KEY`, and `VOBIZ_INBOUND_NUMBER`.
+`LIVEKIT_SIP_URI` is the SIP host from LiveKit, not the project URL subdomain.
 Leave `BUSINESS_NAME` blank until you have a real business identity to give the agent.
 Do not paste real credentials into issues or source files.
 
@@ -175,6 +177,66 @@ Use `uv run python agent.py start` for a production-style process.
 Call the Vobiz number from another phone.
 The full first-call checklist is in `DEPLOYMENT.md`.
 
+## Windows 11 / PowerShell
+
+Install the LiveKit CLI for diagnostics and local agent commands:
+
+```powershell
+winget install LiveKit.LiveKitCLI
+lk --version
+lk cloud auth
+```
+
+Create the local environment file:
+
+```powershell
+Copy-Item .env.example .env
+notepad .env
+```
+
+The key non-secret values are:
+
+```dotenv
+LIVEKIT_URL=wss://your-project.livekit.cloud
+LIVEKIT_SIP_URI=your-sip-subdomain.sip.livekit.cloud
+VOBIZ_INBOUND_NUMBER=+91XXXXXXXXXX
+AGENT_NAME=receptionist
+```
+
+`LIVEKIT_SIP_URI` is the SIP host from LiveKit Cloud **Settings > Project**.
+It is not the project URL subdomain, and it must not include `sip:`.
+
+Run the read-only diagnostic before changing provider settings:
+
+```powershell
+.\.venv\Scripts\python.exe diagnose_inbound.py
+```
+
+List the same LiveKit objects with the CLI:
+
+```powershell
+lk sip inbound list --json
+lk sip dispatch list --json
+```
+
+Create or reuse the LiveKit inbound trunk and dispatch rule:
+
+```powershell
+.\.venv\Scripts\python.exe setup_inbound.py --dry-run
+.\.venv\Scripts\python.exe setup_inbound.py
+```
+
+Start the worker with the command that already registered successfully:
+
+```powershell
+.\.venv\Scripts\python.exe agent.py dev
+```
+
+LiveKit Agents 1.8.9 still supports the Python `dev` command.
+The LiveKit CLI also provides `lk agent dev`, but it registers a development
+deployment. Confirm how your dispatch rule targets deployments before switching
+the command used for the inbound production path.
+
 ## Environment variables
 
 `.env.example` is the complete template.
@@ -183,6 +245,7 @@ The important settings are:
 | Variable | Required | Default | Meaning |
 | --- | --- | --- | --- |
 | `LIVEKIT_URL` | Yes | none | LiveKit Cloud URL, for example `wss://project.livekit.cloud`. |
+| `LIVEKIT_SIP_URI` | Yes for setup | none | SIP host from **Settings > Project > SIP URI**. It can differ from the project URL subdomain. Do not include `sip:`. |
 | `LIVEKIT_API_KEY` | Yes | none | LiveKit API key. Treat it as project control access. |
 | `LIVEKIT_API_SECRET` | Yes | none | LiveKit API secret. |
 | `GROQ_API_KEY` | Yes for the default LLM | none | Groq key. |
@@ -298,7 +361,7 @@ uv run pytest
 Current result:
 
 ```text
-67 passed
+68 passed
 ```
 
 Run the Cloudflare Worker tests:
@@ -460,10 +523,15 @@ This project does not control that provider behavior.
 
 | Symptom | Likely cause | Fix |
 | --- | --- | --- |
+| Immediate “Invalid number” announcement; Vobiz shows inbound calls, answered 0, ₹0 spend | Vobiz did not route the call to LiveKit, or the number/trunk/account is not inbound-enabled. | Get the Vobiz call detail SIP status. Check KYC, trial status, balance, number-to-trunk mapping, and the LiveKit inbound destination. Do not change the agent until the SIP code is known. |
+| Vobiz call detail says `INVALID_NUMBER` or `UNALLOCATED_NUMBER` | Provider-side number or trunk routing problem. | Send the call ID and SIP status to Vobiz Support. Do not change the Python agent for this code. |
+| Vobiz call detail says `NO_ANSWER`, `486`, or `CALL_REJECTED` | The INVITE reached a destination that did not accept it. | Check the LiveKit inbound trunk, dispatch rule, agent deployment, and ringing timeout. |
 | Caller hears silence after dialing | The worker is not running, the agent name does not match, or the dispatch rule has no agent dispatch. | Check `AGENT_NAME`, run `setup_inbound.py`, and read the agent and LiveKit SIP logs. |
-| Call drops with 408 or never reaches LiveKit | The Vobiz inbound destination is wrong or includes `sip:`. | Set it to `<project>.sip.livekit.cloud` with no scheme. |
+| Call drops with 408 or never reaches LiveKit | The Vobiz inbound destination is wrong or includes `sip:`. | Set it to the SIP host from LiveKit **Settings > Project > SIP URI**, with no scheme. Do not use the project URL subdomain. |
 | Vobiz reports no route or no balance | The number is not linked, KYC is incomplete, or the balance is zero. | Complete Vobiz number activation and add the balance required by your account. Do not add funds without approval. |
+| LiveKit room exists but the agent logs no `job_received` | The dispatch rule is missing, bound to the wrong trunk, or targets another agent/deployment. | Run `diagnose_inbound.py` and `lk sip dispatch list --json`. |
 | Agent joins but cannot hear the caller | The caller track is missing, the trunk is not matched, or the number format differs. | Confirm the number is E.164 on both sides and check LiveKit SIP participant events. |
+| `Plugins must be registered on the main thread` | An older copy of `providers.py` imported LiveKit plugins inside the job thread. | Update `providers.py` to import `deepgram`, `openai`, `silero`, and `noise_cancellation` at module load, then restart the worker. |
 | Groq returns 429 | Free-plan token or request limits were reached. | Wait for the quota reset, shorten the prompt and replies, or upgrade only with approval. |
 | Deepgram returns 402 | The credit is exhausted or auto-reload is disabled. | Check the Deepgram console. Do not enable auto-reload without approval. |
 | No speech from the agent | TTS key, provider name, or model is invalid. | Check the `provider_selected` and `session_error` logs. Test with the default Deepgram TTS. |
@@ -472,6 +540,32 @@ This project does not control that provider behavior.
 | Cloudflare dashboard returns 503 | D1 binding or schema is missing. | Replace the database ID, apply `schema.sql`, and redeploy. |
 | Call record missing | SQLite path is not writable or the Cloudflare token is wrong. | Check the `call_record_failed` or `call_event_rejected` log. The call itself still completes. |
 | macOS certificate errors | The Python environment is using unexpected certificates. | Use Python 3.12 from `uv`. Do not disable TLS verification. |
+
+### Vobiz Support request for an inbound failure
+
+Include these facts, not your API keys:
+
+```text
+Vobiz number: +91XXXXXXXXXX
+SIP trunk: your-trunk-name
+Caller: +91XXXXXXXXXX
+Observed: immediate "Invalid number" announcement before normal ringing.
+Vobiz CDR: 2 inbound calls, answered 0, duration about 5–6 seconds,
+           SIP trunk spend ₹0, displayed status "Normal Hangup".
+LiveKit inbound destination: your-sip-subdomain.sip.livekit.cloud
+LiveKit project: your-project.livekit.cloud
+
+Please provide:
+1. The SIP response code, hangup cause, and SIP call ID for each call.
+2. Whether Vobiz sent an INVITE to your-sip-subdomain.sip.livekit.cloud and the reply.
+3. Confirmation that the number is enabled for inbound calls on this trunk.
+4. Confirmation that KYC is approved and the account is not trial-restricted.
+5. Whether a positive prepaid balance is required for inbound calls.
+6. Any number-level activation or inbound subscription required for India.
+```
+
+Do not add funds or change the subscription until Vobiz confirms the requirement.
+
 
 ## Known limitations
 
@@ -499,7 +593,8 @@ Added:
 
 - `providers.py`, `calls.py`, `telephony.py`, `logging_setup.py`.
 - `setup_inbound.py`.
-- `tests/` with 67 tests.
+- `diagnose_inbound.py`.
+- `tests/` with 68 tests.
 - `cloudflare/` with the Worker, D1 schema, 13 tests, and documentation.
 - `proxy.ts` and `lib/validation.ts` in `dashboard/`.
 - `COSTS.md`, `DEPLOYMENT.md`, `SECURITY.md`.
@@ -532,16 +627,19 @@ Complete these before expecting a real call:
 
 ## First incoming call
 
-1. Run `uv run python setup_inbound.py` and confirm the agent name is `receptionist`.
-2. Set the Vobiz inbound destination to the printed SIP hostname without `sip:`.
-3. Start `uv run python agent.py dev`.
-4. Confirm the worker registers and stays running.
-5. Dial the Vobiz number from another phone.
-6. Listen for the greeting and answer the agent's question.
-7. Check the log for `call_started`, `provider_selected`, and `call_finished`.
-8. Hang up and confirm the outcome is `caller_hangup` or `completed`.
-9. Check `data/calls.db` or the Cloudflare dashboard.
-10. If the call fails, use the troubleshooting table and the LiveKit SIP logs.
+1. Set `LIVEKIT_SIP_URI` to the SIP host from LiveKit, for example `your-sip-subdomain.sip.livekit.cloud`.
+2. Run `.\.venv\Scripts\python.exe diagnose_inbound.py` and fix any LiveKit trunk/rule failure.
+3. Run `.\.venv\Scripts\python.exe setup_inbound.py` and confirm the agent name is `receptionist`.
+4. Confirm Vobiz KYC and balance requirements with the provider; do not add funds without approval.
+5. Set the Vobiz inbound destination to the same SIP host, without `sip:` or the project URL subdomain.
+6. Start `.\.venv\Scripts\python.exe agent.py dev`.
+7. Confirm the worker registers and stays running.
+8. Dial the Vobiz number from another phone.
+9. Listen for the greeting and answer the agent's question.
+10. Check the log for `job_received`, `room_connected`, `session_started`, `greeting_started`, `call_started`, `provider_selected`, and `call_finished`.
+11. Hang up and confirm the outcome is `caller_hangup` or `completed`.
+12. Check `data/calls.db` or the Cloudflare dashboard.
+13. If the call fails, stop at the first missing log stage and use the troubleshooting table.
 
 ## Verification sources
 

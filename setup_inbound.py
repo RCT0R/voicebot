@@ -57,6 +57,7 @@ class SetupConfig:
         url = required("LIVEKIT_URL")
         key = required("LIVEKIT_API_KEY")
         secret = required("LIVEKIT_API_SECRET")
+        sip_uri = required("LIVEKIT_SIP_URI")
         raw_number = required("VOBIZ_INBOUND_NUMBER")
         number = normalize_phone(raw_number)
         if raw_number and not number:
@@ -122,7 +123,7 @@ class SetupConfig:
             max_call_duration_seconds=max_duration,
             krisp_enabled=(env.get("NOISE_CANCELLATION") or "true").strip().lower()
             not in {"0", "false", "no", "off"},
-            sip_uri_override=(env.get("LIVEKIT_SIP_URI") or "").strip(),
+            sip_uri_override=sip_uri,
         )
 
 
